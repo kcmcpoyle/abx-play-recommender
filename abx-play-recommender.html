@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABX Play Recommender</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F0F2FA;color:#1a1a2e;min-height:100vh;padding:24px}
+
+/* Top header bar */
+.topbar{display:flex;align-items:center;justify-content:space-between;max-width:1100px;margin:0 auto 20px;padding:0 2px}
+.amp-logo-wrap{display:flex;align-items:center;gap:10px}
+.amp-wordmark{font-size:20px;font-weight:700;color:#1A50DD;letter-spacing:-0.5px}
+.app-title{font-size:13px;color:#6B7280;padding-left:10px;border-left:1px solid #D1D5DB;margin-left:2px}
+.amp-badge{font-size:10px;padding:2px 8px;background:#E8F0FE;color:#1A50DD;border-radius:20px;font-weight:600}
+
+.wrap{display:flex;gap:20px;max-width:1100px;margin:0 auto}
+.sidebar{width:296px;flex-shrink:0}
+.main{flex:1;min-width:0}
+
+.form-card{background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04)}
+.form-title{font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #F3F4F6}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;color:#374151;margin-bottom:4px;font-weight:600}
+.field input,.field select,.field textarea{width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #E5E7EB;background:#FAFAFA;color:#1a1a2e;font-family:inherit;transition:border-color 0.15s,box-shadow 0.15s}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#1A50DD;background:#fff;box-shadow:0 0 0 3px rgba(26,80,221,0.08)}
+.field textarea{resize:vertical;min-height:60px;line-height:1.5}
+.btn-generate{width:100%;padding:11px;background:linear-gradient(135deg,#1A50DD 0%,#3B6FEF 100%);color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;font-family:inherit;letter-spacing:0.2px;transition:opacity 0.15s,transform 0.1s;box-shadow:0 2px 8px rgba(26,80,221,0.25)}
+.btn-generate:hover{opacity:0.92;transform:translateY(-1px)}
+.btn-generate:active{transform:translateY(0)}
+
+/* ---- Empty state ---- */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:460px;text-align:center;gap:0;position:relative;overflow:hidden}
+.empty-bg{position:absolute;inset:0;background:linear-gradient(160deg,#EEF2FF 0%,#F8FAFF 60%,#EEF2FF 100%);border-radius:14px;border:1px solid #E0E7FF}
+.empty-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px}
+.scene{width:260px;height:180px;position:relative}
+
+/* Ground */
+.ground{position:absolute;bottom:0;left:0;right:0;height:6px;background:#C7D2FE;border-radius:3px}
+
+/* Bricks — hidden by default, only visible+animated when .scene has .building class */
+.brick{position:absolute;border-radius:4px;opacity:0}
+.row1-b1{width:40px;height:16px;bottom:6px;left:70px;background:#1A50DD}
+.row1-b2{width:40px;height:16px;bottom:6px;left:114px;background:#1A50DD}
+.row1-b3{width:40px;height:16px;bottom:6px;left:158px;background:#1A50DD}
+.row2-b1{width:40px;height:16px;bottom:22px;left:70px;background:#2563EB}
+.row2-b2{width:40px;height:16px;bottom:22px;left:114px;background:#2563EB}
+.row2-b3{width:40px;height:16px;bottom:22px;left:158px;background:#2563EB}
+.row3-b1{width:40px;height:16px;bottom:38px;left:92px;background:#3B6FEF}
+.row3-b2{width:40px;height:16px;bottom:38px;left:136px;background:#3B6FEF}
+.row4-b1{width:40px;height:16px;bottom:54px;left:114px;background:#60A5FA}
+
+/* Flag — hidden by default */
+.flag{position:absolute;bottom:70px;left:126px;opacity:0}
+.flag-pole{width:2px;height:22px;background:#374151;position:absolute;bottom:0;left:0}
+.flag-tri{width:0;height:0;border-top:8px solid transparent;border-bottom:8px solid transparent;border-left:14px solid #EF4444;position:absolute;bottom:12px;left:2px}
+
+/* Monster characters — idle: completely still */
+.monster-left{position:absolute;bottom:6px;left:10px}
+.monster-right{position:absolute;bottom:6px;right:8px;transform:scaleX(-1)}
+
+/* When .building is added to .scene, everything animates */
+@keyframes appear{to{opacity:1}}
+@keyframes brickLand{0%{transform:scaleY(1.3) translateY(-6px)}60%{transform:scaleY(0.92)}100%{transform:scaleY(1) translateY(0)}}
+@keyframes flagWave{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes monsterBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes monsterBobR{0%,100%{transform:scaleX(-1) translateY(0)}50%{transform:scaleX(-1) translateY(-5px)}}
+@keyframes floatUp{0%{opacity:0;transform:translateY(0)}30%{opacity:1}100%{opacity:0;transform:translateY(-28px)}}
+
+.scene.building .row1-b1{animation:appear 0s 0.1s forwards,brickLand 0.4s 0.1s cubic-bezier(0.34,1.56,0.64,1)}
+.scene.building .row1-b2{animation:appear 0s 0.45s forwards,brickLand 0.4s 0.45s cubic-bezier(0.34,1.56,0.64,1)}
+.scene.building .row1-b3{animation:appear 0s 0.8s forwards,brickLand 0.4s 0.8s cubic-bezier(0.34,1.56,0.64,1)}
+.scene.building .row2-b1{animation:appear 0s 1.15s forwards,brickLand 0.4s 1.15s cubic-bezier(0.34,1.56,0.64,1)}
+.scene.building .row2-b2{animation:appear 0s 1.5s forwards,brickLand 0.4s 1.5s cubic-bezier(0.34,1.56,0.64,1)}
+.scene.building .row2-b3{animation:appear 0s 1.85s forwards,brickLand 0.4s 1.85s cubic-bezier(0.34,1.56,0.64,1)}
+.scene.building .row3-b1{animation:appear 0s 2.2s forwards,brickLand 0.4s 2.2s cubic-bezier(0.34,1.56,0.64,1)}
+.scene.building .row3-b2{animation:appear 0s 2.55s forwards,brickLand 0.4s 2.55s cubic-bezier(0.34,1.56,0.64,1)}
+.scene.building .row4-b1{animation:appear 0s 2.9s forwards,brickLand 0.4s 2.9s cubic-bezier(0.34,1.56,0.64,1)}
+.scene.building .flag{animation:appear 0s 3.3s forwards,flagWave 1s 3.4s ease-in-out infinite}
+.scene.building .monster-left{animation:monsterBob 0.7s 0.1s ease-in-out infinite}
+.scene.building .monster-right{animation:monsterBobR 0.7s 0.3s ease-in-out infinite}
+
+/* Sparkles — only during building */
+.sparkle{position:absolute;font-size:13px;opacity:0;pointer-events:none}
+.sp1{bottom:60px;left:32px}
+.sp2{bottom:90px;right:28px}
+.sp3{bottom:115px;left:110px}
+.scene.building .sp1{animation:floatUp 2s 0.6s ease-out infinite}
+.scene.building .sp2{animation:floatUp 2s 1.4s ease-out infinite}
+.scene.building .sp3{animation:floatUp 2s 2.2s ease-out infinite}
+
+.empty-headline{font-size:15px;font-weight:700;color:#1A50DD;margin-bottom:4px}
+.empty-sub{font-size:13px;color:#6B7280;max-width:260px;line-height:1.6}
+
+/* Results */
+.results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.results-title{font-size:15px;font-weight:700;color:#1a1a2e}
+.results-meta{font-size:12px;color:#6B7280;background:#fff;padding:4px 12px;border-radius:20px;border:1px solid #E5E7EB}
+
+.play-card{background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:20px;margin-bottom:12px;transition:border-color 0.18s,transform 0.18s,box-shadow 0.18s;cursor:default;position:relative;overflow:hidden}
+.play-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#1A50DD,#60A5FA);opacity:0;transition:opacity 0.18s}
+.play-card:hover{border-color:#93C5FD;transform:translateY(-2px);box-shadow:0 8px 24px rgba(26,80,221,0.1)}
+.play-card:hover::before{opacity:1}
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.card-left{flex:1;min-width:0}
+.play-num{font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px}
+.play-title{font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:8px}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600}
+.tag-channel{background:#EEF2FF;color:#3730A3}
+.tag-effort-low{background:#ECFDF5;color:#065F46}
+.tag-effort-med{background:#FFFBEB;color:#92400E}
+.tag-effort-high{background:#FEF2F2;color:#991B1B}
+.tag-budget{background:#F3F4F6;color:#4B5563}
+.score-badge{flex-shrink:0;width:54px;height:54px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-left:16px;border:2.5px solid}
+.score-high{border-color:#1A50DD;background:#EEF2FF;color:#1A50DD}
+.score-med{border-color:#D97706;background:#FFFBEB;color:#92400E}
+.score-num{font-size:18px;font-weight:800;line-height:1}
+.score-label{font-size:8px;font-weight:700;letter-spacing:0.6px;margin-top:1px}
+.divider{height:1px;background:#F3F4F6;margin:12px 0}
+.desc{font-size:13px;color:#4B5563;line-height:1.7;margin-bottom:10px}
+.why{font-size:12px;color:#374151;line-height:1.6;padding:10px 12px;background:#F0F7FF;border-radius:0 8px 8px 0;border-left:3px solid #60A5FA;margin-bottom:12px}
+.copy-section{background:#F8F9FA;border-radius:10px;padding:12px 14px;border:1px solid #F0F0F5}
+.copy-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.copy-label{font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.6px}
+.copy-btn{font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid #E5E7EB;background:#fff;color:#6B7280;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:inherit;font-weight:600;transition:background 0.12s}
+.copy-btn:hover{background:#EEF2FF;color:#1A50DD;border-color:#C7D2FE}
+.copy-btn.copied{color:#065F46;border-color:#6EE7B7;background:#ECFDF5}
+.copy-text{font-size:12px;color:#4B5563;line-height:1.7;white-space:pre-wrap;font-family:inherit}
+
+/* Suggested contacts */
+.contacts-section{margin-top:12px;border-top:1px solid #F3F4F6;padding-top:12px}
+.contacts-label{font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px}
+.contact-list{display:flex;flex-direction:column;gap:8px}
+.contact-row{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#F8F9FA;border-radius:9px;border:1px solid #F0F0F5;transition:border-color 0.12s}
+.contact-row:hover{border-color:#C7D2FE;background:#F5F7FF}
+.contact-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.contact-info{flex:1;min-width:0}
+.contact-name{font-size:12px;font-weight:600;color:#1a1a2e}
+.contact-title{font-size:11px;color:#6B7280;margin-top:1px}
+.contact-reason{font-size:11px;color:#4B5563;background:#EEF2FF;color:#3730A3;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0;font-weight:500}
+
+@media(max-width:720px){.wrap{flex-direction:column}.sidebar{width:100%}.topbar{flex-direction:column;align-items:flex-start;gap:8px}}
+</style>
+</head>
+<body>
+
+<!-- Top bar with Amplitude logo -->
+<div class="topbar">
+  <div class="amp-logo-wrap">
+    <!-- Amplitude logo SVG -->
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Amplitude">
+      <rect width="36" height="36" rx="8" fill="#1A50DD"/>
+      <path d="M7 24L13.5 10L17.5 18.5L20.5 13L24 20H29" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="amp-wordmark">Amplitude</span>
+    <span class="app-title">ABX Play Engine</span>
+    <span class="amp-badge">Beta</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="sidebar">
+    <div class="form-card">
+      <div class="form-title">Account details</div>
+
+      <div class="field">
+        <label>Account name</label>
+        <input type="text" id="account" placeholder="e.g. Walmart, JPMorgan...">
+      </div>
+      <div class="field">
+        <label>Industry</label>
+        <select id="industry">
+          <option value="">Select industry</option>
+          <option value="Financial Services">Financial Services</option>
+          <option value="Retail & eCommerce" selected>Retail & eCommerce</option>
+          <option value="Media & Entertainment">Media & Entertainment</option>
+          <option value="Travel & Hospitality">Travel & Hospitality</option>
+          <option value="Technology & SaaS">Technology & SaaS</option>
+          <option value="QSR & Food Service">QSR & Food Service</option>
+          <option value="Logistics & Supply Chain">Logistics & Supply Chain</option>
+          <option value="Healthcare">Healthcare</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Geo</label>
+        <select id="geo">
+          <option value="AMER" selected>AMER</option>
+          <option value="EMEA">EMEA</option>
+          <option value="APJ">APJ</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Account type</label>
+        <select id="acctType">
+          <option value="Prospect" selected>Prospect</option>
+          <option value="Customer">Customer</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Deal stage</label>
+        <select id="stage">
+          <option value="">No Open Opps</option>
+          <option value="S1">S1 — Discovery</option>
+          <option value="S2" selected>S2 — Qualification</option>
+          <option value="S3">S3 — Technical eval</option>
+          <option value="S4">S4 — Proposal</option>
+          <option value="S5">S5 — Negotiation</option>
+          <option value="S6">S6 — Closed</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Persona to target</label>
+        <select id="persona">
+          <option value="All" selected>All</option>
+          <option value="Product">Product</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Data">Data</option>
+          <option value="Engineering">Engineering</option>
+          <option value="AI Builder">AI Builder</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>ABX goal</label>
+        <select id="goal">
+          <option value="">Auto-infer from stage</option>
+          <option value="Generate pipeline" selected>Generate pipeline</option>
+          <option value="Accelerate deal">Accelerate deal</option>
+          <option value="Multithread personas">Multithread personas</option>
+          <option value="Prevent churn">Prevent churn</option>
+          <option value="Drive expansion">Drive expansion</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Key challenge or context <span style="font-weight:400;color:#9CA3AF">(optional)</span></label>
+        <textarea id="context" placeholder="e.g. Champion went dark, evaluating Mixpanel...">Evaluating Mixpanel as an alternative</textarea>
+      </div>
+      <button class="btn-generate" onclick="generate()">✦ Generate plays</button>
+    </div>
+  </div>
+
+  <div class="main" id="main">
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-bg"></div>
+      <div class="empty-content">
+        <div class="scene" id="scene" aria-hidden="true">
+          <div class="ground"></div>
+
+          <!-- Bricks (hidden until .building is added) -->
+          <div class="brick row1-b1"></div>
+          <div class="brick row1-b2"></div>
+          <div class="brick row1-b3"></div>
+          <div class="brick row2-b1"></div>
+          <div class="brick row2-b2"></div>
+          <div class="brick row2-b3"></div>
+          <div class="brick row3-b1"></div>
+          <div class="brick row3-b2"></div>
+          <div class="brick row4-b1"></div>
+
+          <!-- Flag (hidden until .building) -->
+          <div class="flag">
+            <div class="flag-pole"></div>
+            <div class="flag-tri"></div>
+          </div>
+
+          <!-- Amplitude Data Monster — left -->
+          <div class="monster-left">
+            <svg width="46" height="58" viewBox="0 0 46 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Horns -->
+              <path d="M13 12 L10 2 L17 10" fill="#4338CA"/>
+              <path d="M27 10 L30 1 L33 11" fill="#4338CA"/>
+              <!-- Body -->
+              <ellipse cx="23" cy="32" rx="18" ry="20" fill="#1A50DD"/>
+              <!-- Belly -->
+              <ellipse cx="23" cy="36" rx="11" ry="13" fill="#3B6FEF"/>
+              <!-- Eyes -->
+              <circle cx="16" cy="26" r="5.5" fill="white"/>
+              <circle cx="30" cy="26" r="5.5" fill="white"/>
+              <circle cx="17" cy="26" r="2.5" fill="#1e1b4b"/>
+              <circle cx="31" cy="26" r="2.5" fill="#1e1b4b"/>
+              <!-- Eye shine -->
+              <circle cx="18" cy="24.5" r="1" fill="white"/>
+              <circle cx="32" cy="24.5" r="1" fill="white"/>
+              <!-- Smile -->
+              <path d="M17 35 Q23 40 29 35" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
+              <!-- Left arm holding brick -->
+              <path d="M5 34 Q2 38 5 42" stroke="#1A50DD" stroke-width="5" stroke-linecap="round" fill="none"/>
+              <!-- Brick in hand -->
+              <rect x="-2" y="40" width="14" height="8" rx="2" fill="#60A5FA"/>
+              <!-- Right arm -->
+              <path d="M41 34 Q44 38 41 42" stroke="#1A50DD" stroke-width="5" stroke-linecap="round" fill="none"/>
+              <!-- Legs -->
+              <rect x="15" y="50" width="6" height="8" rx="3" fill="#1643BB"/>
+              <rect x="25" y="50" width="6" height="8" rx="3" fill="#1643BB"/>
+              <!-- Feet -->
+              <ellipse cx="18" cy="58" rx="5" ry="2.5" fill="#1643BB"/>
+              <ellipse cx="28" cy="58" rx="5" ry="2.5" fill="#1643BB"/>
+            </svg>
+          </div>
+
+          <!-- Amplitude Data Monster — right (mirrored via CSS scaleX) -->
+          <div class="monster-right">
+            <svg width="46" height="58" viewBox="0 0 46 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M13 12 L10 2 L17 10" fill="#4338CA"/>
+              <path d="M27 10 L30 1 L33 11" fill="#4338CA"/>
+              <ellipse cx="23" cy="32" rx="18" ry="20" fill="#1A50DD"/>
+              <ellipse cx="23" cy="36" rx="11" ry="13" fill="#3B6FEF"/>
+              <circle cx="16" cy="26" r="5.5" fill="white"/>
+              <circle cx="30" cy="26" r="5.5" fill="white"/>
+              <circle cx="17" cy="26" r="2.5" fill="#1e1b4b"/>
+              <circle cx="31" cy="26" r="2.5" fill="#1e1b4b"/>
+              <circle cx="18" cy="24.5" r="1" fill="white"/>
+              <circle cx="32" cy="24.5" r="1" fill="white"/>
+              <path d="M17 35 Q23 40 29 35" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
+              <path d="M5 34 Q2 38 5 42" stroke="#1A50DD" stroke-width="5" stroke-linecap="round" fill="none"/>
+              <rect x="-2" y="40" width="14" height="8" rx="2" fill="#60A5FA"/>
+              <path d="M41 34 Q44 38 41 42" stroke="#1A50DD" stroke-width="5" stroke-linecap="round" fill="none"/>
+              <rect x="15" y="50" width="6" height="8" rx="3" fill="#1643BB"/>
+              <rect x="25" y="50" width="6" height="8" rx="3" fill="#1643BB"/>
+              <ellipse cx="18" cy="58" rx="5" ry="2.5" fill="#1643BB"/>
+              <ellipse cx="28" cy="58" rx="5" ry="2.5" fill="#1643BB"/>
+            </svg>
+          </div>
+
+          <!-- Sparkles (only animate during .building) -->
+          <div class="sparkle sp1">✦</div>
+          <div class="sparkle sp2">✦</div>
+          <div class="sparkle sp3">✦</div>
+        </div>
+
+        <div class="empty-headline" id="emptyHeadline">Your playbook awaits.</div>
+        <p class="empty-sub">Fill in the account details and click <strong>Generate plays</strong> to get your personalized ABX recommendations.</p>
+      </div>
+    </div>
+
+    <div id="results" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+const INDUSTRY_HOOKS = {
+  "Financial Services": {pain:"regulatory pressure and fragmented data across trading, retail, and wealth management",trend:"real-time personalization in digital banking",metric:"23% lift in digital product adoption"},
+  "Retail & eCommerce": {pain:"rising acquisition costs and cart abandonment eating into margins",trend:"unified online-to-offline customer journeys",metric:"31% reduction in checkout drop-off"},
+  "Media & Entertainment": {pain:"subscriber churn and content discovery friction",trend:"behavioral analytics driving content recommendation",metric:"18% improvement in subscriber retention"},
+  "Travel & Hospitality": {pain:"loyalty program disengagement and booking funnel drop-off",trend:"post-pandemic traveler expectation shifts",metric:"27% increase in direct booking conversion"},
+  "Technology & SaaS": {pain:"slow feature adoption and high time-to-value for new users",trend:"product-led growth and usage-based expansion",metric:"40% faster activation for new accounts"},
+  "QSR & Food Service": {pain:"app-to-in-store experience gaps and loyalty program friction",trend:"digital ordering and personalized offers driving LTV",metric:"22% increase in repeat order frequency"},
+  "Logistics & Supply Chain": {pain:"real-time visibility gaps and customer portal underutilization",trend:"digital self-service and proactive shipment comms",metric:"35% reduction in support ticket volume"},
+  "Healthcare": {pain:"patient portal drop-off and low digital engagement post-visit",trend:"personalized care journey and health outcome tracking",metric:"29% improvement in patient app retention"},
+  "enterprise": {pain:"siloed analytics and slow insight-to-action cycles",trend:"product-led growth and real-time behavioral data",metric:"30%+ improvement in key conversion metrics"}
+};
+
+const PERSONA_HOOKS = {
+  "Product": {angle:"shipping faster with confidence",owns:"roadmap prioritization and activation metrics",cares:"reducing time between insight and decision"},
+  "Marketing": {angle:"proving campaign ROI and reducing wasted spend",owns:"acquisition funnels and lifecycle programs",cares:"tying marketing touchpoints to downstream revenue"},
+  "Data": {angle:"building a trusted, governed analytics layer",owns:"data pipelines, warehouses, and instrumentation",cares:"data quality, self-serve access, and reducing ad hoc requests"},
+  "Engineering": {angle:"instrumenting product telemetry without slowing down releases",owns:"SDK implementation, data infra, and event taxonomy",cares:"developer experience and low-overhead integration"},
+  "AI Builder": {angle:"grounding AI features in real behavioral signals",owns:"model training pipelines and feature stores",cares:"behavioral data quality for training and evaluation"},
+  "All": {angle:"moving from gut-feel to data-driven decisions across the org",owns:"cross-functional analytics adoption",cares:"alignment on metrics and reducing insight latency"}
+};
+
+const CONTACTS_DB = {
+  "Generate pipeline": [
+    {name:"Sarah Chen",title:"SVP, Digital Products",initials:"SC",color:"#E8F0FE",textColor:"#1A50DD",reason:"Economic buyer"},
+    {name:"Marcus Webb",title:"VP of Product Analytics",initials:"MW",color:"#F0FDF4",textColor:"#166534",reason:"Champion target"},
+    {name:"Priya Nair",title:"Chief Data Officer",initials:"PN",color:"#FFF7ED",textColor:"#9A3412",reason:"Exec sponsor"}
+  ],
+  "Accelerate deal": [
+    {name:"James Okafor",title:"Director of Product",initials:"JO",color:"#E8F0FE",textColor:"#1A50DD",reason:"Active champion"},
+    {name:"Lena Hoffmann",title:"VP of Engineering",initials:"LH",color:"#FDF4FF",textColor:"#7E22CE",reason:"Technical eval owner"},
+    {name:"David Park",title:"CFO",initials:"DP",color:"#FFF7ED",textColor:"#9A3412",reason:"Economic buyer"}
+  ],
+  "Multithread personas": [
+    {name:"Aisha Patel",title:"Head of Growth",initials:"AP",color:"#F0FDF4",textColor:"#166534",reason:"Growth persona"},
+    {name:"Tom Eriksson",title:"Principal Data Engineer",initials:"TE",color:"#E8F0FE",textColor:"#1A50DD",reason:"Data persona"},
+    {name:"Rachel Kim",title:"Director of Product Management",initials:"RK",color:"#FDF4FF",textColor:"#7E22CE",reason:"Product persona"}
+  ],
+  "Prevent churn": [
+    {name:"Carlos Rivera",title:"VP Customer Success",initials:"CR",color:"#FFF7ED",textColor:"#9A3412",reason:"Executive sponsor"},
+    {name:"Nina Johansson",title:"Analytics Manager",initials:"NJ",color:"#E8F0FE",textColor:"#1A50DD",reason:"Day-to-day user"},
+    {name:"Ben Osei",title:"Chief Product Officer",initials:"BO",color:"#F0FDF4",textColor:"#166534",reason:"Risk: low engagement"}
+  ],
+  "Drive expansion": [
+    {name:"Yuki Tanaka",title:"VP of Marketing Technology",initials:"YT",color:"#FDF4FF",textColor:"#7E22CE",reason:"Expansion target"},
+    {name:"Omar Khalil",title:"Head of Data Science",initials:"OK",color:"#E8F0FE",textColor:"#1A50DD",reason:"AI/ML use case"},
+    {name:"Fiona Walsh",title:"Chief Digital Officer",initials:"FW",color:"#FFF7ED",textColor:"#9A3412",reason:"Exec sponsor"}
+  ]
+};
+
+const PLAYS_DB = {
+  "Generate pipeline": [
+    {
+      title: "Executive air cover campaign",
+      channels: ["LinkedIn Ads","Direct Mail","Executive outreach"],
+      effort: "High", budget: "$8,000–$15,000",
+      desc: (acct, ind, geo) => `Launch a C-suite targeted LinkedIn sequence paired with a personalized direct mail piece to 3–5 senior leaders at ${acct} (${geo}). Use ${ind}-specific messaging around competitive intelligence and digital analytics maturity to open new doors above the current contact.`,
+      why: "Executives at Fortune 500 accounts rarely enter pipeline via inbound — proactive air cover dramatically increases reply rates when a champion is absent.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"],p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\nI've been following what ${acct} is building on the digital side — the ${h.trend} push is hard to miss. Most ${ind} leaders I talk to are wrestling with the same thing: ${h.pain}.\n\nFor someone focused on ${p.angle}, that gap tends to show up in [specific metric or workflow] first — and it compounds fast.\n\nWe've helped a handful of similar teams get to ${h.metric}. Not sure if the timing is right for ${acct}, but worth a quick conversation?\n\n– [Your name]`; }
+    },
+    {
+      title: "Curated gifting + outreach sequence",
+      channels: ["Gifting (Sendoso)","Email","LinkedIn"],
+      effort: "Medium", budget: "$2,500–$5,000",
+      desc: (acct, ind, geo) => `Send a curated gift (book, experience credit, or branded item) to 3–5 target buyers at ${acct}, timed to arrive before a personalized email that references it. Use ${ind}-relevant themes — e.g. a data-focused book for analytics leaders — to make it feel considered rather than promotional.`,
+      why: "Physical gifting breaks through digital noise at enterprise accounts — response rates to follow-up emails are 3–5x higher when the gift lands first and the message references it naturally.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nI sent something your way — should arrive [this week / by Thursday]. Not a pitch, just something I thought was worth your time given the conversations happening in ${ind} right now around ${h.trend}.\n\nIf it resonates, I'd love 20 minutes to share what we're seeing from teams at ${acct}'s scale who are getting ahead of ${h.pain}.\n\n– [Your name]`; }
+    },
+    {
+      title: "Intent-triggered content syndication",
+      channels: ["Programmatic","Content syndication","Email nurture"],
+      effort: "Medium", budget: "$3,000–$6,000",
+      desc: (acct, ind, geo) => `Run programmatic ads to ${acct} IP ranges tied to intent signals in the analytics/data category across ${geo}. Pair with a gated ${ind} benchmark report to capture net-new contacts and feed them into a 4-touch nurture sequence.`,
+      why: "Content syndication converts intent into pipeline 3x faster than cold outreach alone — the benchmark report positions Amplitude as the category authority.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"],p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\nWe just wrapped a benchmark study on how ${ind} teams are tackling ${h.pain} — and the gap between leaders and the rest is pretty stark.\n\nGiven that you're likely thinking about ${p.angle}, I thought the findings might be useful context — just the data on where teams at ${acct}'s scale are investing and what's actually moving the needle.\n\nHappy to send it over.\n\n– [Your name]`; }
+    },
+    {
+      title: "1:1 LinkedIn ad track",
+      channels: ["LinkedIn matched audience","Sponsored content","InMail"],
+      effort: "Low", budget: "$1,000–$2,500",
+      desc: (acct, ind, geo) => `Build a matched audience of 5–10 named buyers at ${acct} and run hyper-targeted sponsored content and InMail sequences tailored to their specific role and ${ind} pain points. Rotate 3 creative variants over 4 weeks to find the message that lands.`,
+      why: "1:1 LinkedIn targeting keeps spend surgical — you're spending $0 on anyone outside the account, and frequency against a small named list builds familiarity before cold outreach lands.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"],p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\nI'll keep this short — I've been running into a lot of ${p.owns} leaders in ${ind} lately who are dealing with ${h.pain}, and it made me think of ${acct}.\n\nWe have a perspective on how teams at your scale are getting ahead of it. Worth a 15-minute call to share what we're seeing?\n\n– [Your name]`; }
+    },
+    {
+      title: "Persona-specific VIP dinner",
+      channels: ["In-person event","VIP dinner","Executive outreach"],
+      effort: "High", budget: "$12,000–$20,000",
+      desc: (acct, ind, geo) => `Host an invite-only dinner in ${acct}'s HQ city targeting VP+ product and analytics leaders. Frame around a provocative industry thesis relevant to ${ind} — no vendor pitch, just a room worth being in.`,
+      why: "Exclusive peer-to-peer formats dramatically accelerate trust and open discovery conversations that cold channels can't replicate at enterprise scale.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nWe're pulling together a small dinner in [City] on [Date] — the conversation will be off the record, no slides, just a handful of ${ind} executives talking honestly about ${h.trend} and what's actually working.\n\nThought of you because the group is intentionally small and the topics are squarely in your world. No pitch, I promise.\n\nInterested in a seat?\n\n– [Your name]`; }
+    },
+    {
+      title: "Onsite executive briefing",
+      channels: ["Onsite visit","Custom briefing deck","Executive sponsor"],
+      effort: "High", budget: "$5,000–$10,000",
+      desc: (acct, ind, geo) => `Bring a senior Amplitude executive to ${acct}'s offices for a custom briefing session — not a standard demo, but a working session built around ${acct}'s specific ${ind} challenges, org structure, and roadmap priorities. Deliver a leave-behind tailored to their business case.`,
+      why: "Showing up onsite signals commitment and seriousness in a way no Zoom call can — it moves the relationship from vendor to strategic partner, especially with C-level stakeholders.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nI'd love to bring [our CPO / VP] to ${acct}'s offices for a working session — not a demo, more of a candid conversation about ${h.pain} and what we're seeing work at companies of your scale.\n\nWe'd come prepared, keep it tight, and make sure it's worth the hour. Would [week of X] work?\n\n– [Your name]`; }
+    }
+  ],
+  "Accelerate deal": [
+    {
+      title: "Competitive displacement bundle",
+      channels: ["Email","Slack/Teams","Custom landing page"],
+      effort: "Medium", budget: "$1,500–$3,000",
+      desc: (acct, ind, geo) => `Build a ${acct}-specific microsite comparing Amplitude against the competitor they're evaluating — migration path, TCO breakdown, and customer references from similar ${ind} accounts. Give the champion a shareable link they can forward internally without needing AE involvement.`,
+      why: "Champion-ready internal selling assets shorten deal cycles by 2–3 weeks on average — they build the business case without needing your AE in every room.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"],p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\nI know you're comparing options, and I don't want to add noise — so instead I put together something actually useful: a ${acct}-specific breakdown with the migration path, a TCO model, and reference calls from ${ind} teams who made the same decision.\n\nThe piece on ${p.angle} is probably most relevant to where you sit — it includes the ${h.metric} outcome that keeps coming up.\n\nLink: [custom URL] — feel free to share internally.\n\n– [Your name]`; }
+    },
+    {
+      title: "Champion gifting — break the silence",
+      channels: ["Gifting (Sendoso)","Email","Phone"],
+      effort: "Low", budget: "$500–$1,500",
+      desc: (acct, ind, geo) => `If the deal has gone quiet, send a thoughtful, low-key gift to the champion at ${acct} — something relevant to their work or interests — paired with a casual check-in that doesn't mention the deal. The goal is to reopen the relationship, not the proposal.`,
+      why: "Deals go quiet because champions get buried, not because they've decided against you. A personal touchpoint that isn't transactional breaks the pattern and gets a response when emails don't.",
+      copy: (acct, ind, persona) => `Hi [Name],\n\nSent something your way — no agenda attached, just thought of you.\n\nHope things have settled down on your end. Whenever the timing is right to pick up where we left off, I'm here. No pressure at all.\n\n– [Your name]`
+    },
+    {
+      title: "Proof of value sprint",
+      channels: ["Workshop","Product trial","Shared Slack channel"],
+      effort: "High", budget: "$2,000–$5,000",
+      desc: (acct, ind, geo) => `Run a focused 2-week POV with ${acct}'s key stakeholders, structured around 3 pre-agreed success criteria tied to ${ind} outcomes. Deliver a final readout deck built for the economic buyer with clear before/after evidence.`,
+      why: "Structured POVs with agreed criteria give economic buyers the validation they need to approve spend — ambiguous open-ended trials stall in committee.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nRather than keep the eval open-ended, I want to propose something more concrete: a two-week sprint where we agree upfront on exactly what success looks like for ${acct} — not generic benchmarks, but your numbers, your workflows.\n\nWe'd pick three outcomes tied to ${h.pain}, run it tight, and deliver a full readout for [Economic Buyer]. The ${ind} teams who've done this say it cuts the back-and-forth in half.\n\nWorth 30 minutes to scope it?\n\n– [Your name]`; }
+    },
+    {
+      title: "1:1 economic buyer ad track",
+      channels: ["LinkedIn matched audience","Personalized video","Direct mail"],
+      effort: "Medium", budget: "$1,000–$2,500",
+      desc: (acct, ind, geo) => `Run a targeted LinkedIn campaign against the specific economic buyer at ${acct}, combined with a personalized Loom video from your VP and a physical leave-behind. The goal is name recognition before the champion introduces you — so you're not a stranger when you get in the room.`,
+      why: "Economic buyers who've seen your brand before a champion intro are 2x more likely to take the meeting — 1:1 targeting builds familiarity without cold outreach pressure.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nI recorded a short video for you — three minutes, specific to ${acct} — because the conversation your team is having right now deserves more than a deck.\n\nTwo ${ind} companies at ${acct}'s scale tackled ${h.pain} during their eval period and both hit ${h.metric} within a quarter. I walk through how in the video.\n\n[Loom link]\n\nHappy to connect directly if anything resonates.\n\n– [Your name]`; }
+    },
+    {
+      title: "Onsite working session",
+      channels: ["Onsite visit","Live product session","Champion co-present"],
+      effort: "High", budget: "$3,000–$6,000",
+      desc: (acct, ind, geo) => `Bring your AE and a solutions engineer to ${acct}'s offices for a hands-on working session built around their actual data questions — not a scripted demo. Co-present with the champion to signal internal alignment and give the economic buyer a live look at the product in their context.`,
+      why: "Onsite sessions compress the eval timeline dramatically — what takes 3 weeks over Zoom often resolves in a single afternoon when you're in the same room with the decision-makers.",
+      copy: (acct, ind, persona) => `Hi [Name],\n\nI'd love to come to ${acct}'s offices with our solutions team for a working session — we'd build it entirely around your actual questions and data environment, not a canned demo.\n\n[Champion name] would co-present with us, which usually makes the conversation a lot more grounded.\n\nWould [week of X] work for an afternoon?\n\n– [Your name]`
+    },
+    {
+      title: "Executive sponsor alignment call",
+      channels: ["Executive meeting","Personalized deck","Phone / Video"],
+      effort: "Medium", budget: "$500–$1,000",
+      desc: (acct, ind, geo) => `Arrange a VP-to-VP alignment call between Amplitude leadership and ${acct}'s economic buyer — framed not as a vendor check-in but as a peer conversation about where ${ind} is heading and how both organizations can win together.`,
+      why: "Late-stage deals often stall because the economic buyer has never had a direct relationship with anyone at Amplitude — a peer conversation from a senior leader changes the dynamic.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\n[Our VP] asked me to reach out directly — they've been following what ${acct} is building and would love 30 minutes to share a perspective on where ${h.trend} is heading in ${ind}.\n\nNot a sales call — more of a peer conversation about what's working and what isn't at this scale.\n\nWould that be worth the time?\n\n– [Your name]`; }
+    }
+  ],
+  "Multithread personas": [
+    {
+      title: "1:1 persona ad tracks by role",
+      channels: ["LinkedIn matched audience","Role-specific landing pages","Email"],
+      effort: "Medium", budget: "$3,000–$6,000",
+      desc: (acct, ind, geo) => `Build separate LinkedIn matched audiences for Product, Engineering, and Data personas at ${acct}, each served different creative and landing pages matched to their specific pain points. Run 3–4 week sequences and use engagement signals to identify warmest contacts for AE outreach.`,
+      why: "1:1 role-based targeting means your message is never irrelevant — each persona sees something built for them, not a generic ad. Warm engagement signals before outreach dramatically improve reply rates.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"],p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\nI work with a lot of ${p.owns} teams in ${ind} and the question I keep hearing is about ${p.cares} — how to get there when the tooling and data aren't keeping pace.\n\nAt ${acct}'s scale, that tends to hit ${p.angle} hardest first. I've got a perspective on the path that's worked for similar teams.\n\nOpen to a 20-minute conversation? I'd bring specific examples, not a demo.\n\n– [Your name]`; }
+    },
+    {
+      title: "Role-specific gifting campaign",
+      channels: ["Gifting (Sendoso)","LinkedIn","Email"],
+      effort: "Medium", budget: "$3,000–$6,000",
+      desc: (acct, ind, geo) => `Send persona-matched gifts to 3–4 target roles at ${acct} — e.g. a technical book for the data lead, a strategy resource for the product VP, an experience credit for the marketing director. Follow each with a personalized note referencing the gift and their specific context.`,
+      why: "Persona-specific gifting signals that you've done your homework — it opens doors with stakeholders who would never respond to a cold email because it demonstrates genuine relevance before a word is said.",
+      copy: (acct, ind, persona) => { const p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\nI sent something your way that I thought might be relevant to the ${p.angle} work — not a pitch, just something worth your time.\n\nI'd love to share what we're hearing from ${p.owns} leaders at companies like ${acct} if you're open to a short conversation whenever the timing works.\n\n– [Your name]`; }
+    },
+    {
+      title: "Internal champion enablement kit",
+      channels: ["Email","Shared doc","Slack"],
+      effort: "Low", budget: "$500–$1,000",
+      desc: (acct, ind, geo) => `Give your existing champion at ${acct} everything they need to introduce Amplitude to adjacent stakeholders: an exec summary, a stakeholder map template, and a customized ROI one-pager built around their specific ${ind} context.`,
+      why: "Champions who have the right materials get internal buy-in 2x faster — removing the burden of building slides keeps momentum alive between your touchpoints.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nI know you've got internal conversations ahead and building the case from scratch is the last thing you need right now.\n\nI put together a short package — exec summary, stakeholder map, and an ROI one-pager with ${ind}-specific numbers built around the ${h.metric} outcome. Adapt it however you need.\n\nLet me know if you want me to adjust the framing for a specific audience.\n\n– [Your name]`; }
+    },
+    {
+      title: "Persona roundtable — field event",
+      channels: ["In-person roundtable","Invite-only","Executive outreach"],
+      effort: "High", budget: "$8,000–$15,000",
+      desc: (acct, ind, geo) => `Host a half-day roundtable in ${acct}'s region for 8–12 leaders from a specific persona (e.g. Data & Analytics leaders in ${ind}). Include ${acct} targets alongside peers from non-competing accounts to create genuine knowledge exchange — not a product session.`,
+      why: "Peer roundtables pull personas who'd never attend a vendor webinar — the draw is learning from their peers, and Amplitude earns trust by facilitating rather than pitching.",
+      copy: (acct, ind, persona) => { const p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\nWe're hosting a small roundtable for ${p.owns} leaders in [City] on [Date] — the focus is on ${p.cares} and how teams at scale are actually solving it. It's peer-led, off the record, and intentionally small.\n\nThought of you because the conversation is squarely in your world and the group is good. No Amplitude pitch — we're just hosting.\n\nInterested?\n\n– [Your name]`; }
+    },
+    {
+      title: "Security & IT stakeholder briefing",
+      channels: ["1:1 briefing","Security/compliance docs","Webinar"],
+      effort: "Medium", budget: "$1,000–$2,500",
+      desc: (acct, ind, geo) => `Offer a dedicated technical briefing for ${acct}'s data engineering and IT security teams — SOC 2, data residency, architecture, and compliance certifications relevant to ${geo}. Send a pre-built security questionnaire kit to remove procurement friction.`,
+      why: "Technical blockers in procurement are one of the top reasons late-stage deals slip — getting IT and InfoSec comfortable early removes a common veto point.",
+      copy: (acct, ind, persona) => `Hi [Name],\n\nFor teams at ${acct}'s scale, the security review usually comes late in the process — and that's where deals slow down.\n\nWe offer a dedicated 30-minute briefing earlier in the conversation so your InfoSec and data engineering teams can get their questions answered before procurement is involved. SOC 2, data residency, instrumentation architecture — whatever's on the list.\n\nWould it make sense to get that on the calendar now?\n\n– [Your name]`
+    }
+  ],
+  "Prevent churn": [
+    {
+      title: "Accelerated executive business review",
+      channels: ["In-person meeting","Exec briefing","Custom deck"],
+      effort: "High", budget: "$2,000–$4,000",
+      desc: (acct, ind, geo) => `Pull forward the QBR for ${acct} and elevate it to include a C-level participant from Amplitude. Build a value realization deck anchored in actual ${acct} usage data and ${ind} benchmarks — frame the renewal before it becomes a negotiation.`,
+      why: "Accounts that get proactive senior-level touchpoints are 40% less likely to churn — QBRs that wait until 60 days before renewal are too late to shift the conversation.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nI've been looking at how ${acct} is tracking against the goals we set at the start of the year and I think there's a stronger story to tell than the standard QBR would show.\n\nI'd love to pull it forward — bring in [Executive] from our side and walk through the actual impact data alongside some ${ind} benchmarks that give it context. It reframes the renewal before it becomes a negotiation.\n\nDoes [proposed date] work?\n\n– [Your name]`; }
+    },
+    {
+      title: "Re-engagement gifting sequence",
+      channels: ["Gifting (Sendoso)","Email","LinkedIn"],
+      effort: "Low", budget: "$500–$1,500",
+      desc: (acct, ind, geo) => `If a champion at ${acct} has gone dark, send a thoughtful, low-key gift with a casual handwritten note — no deal language, no asks. Follow up one week later with a relevant insight or case study, then a soft invitation to reconnect.`,
+      why: "Dark champions are rarely lost — they're overwhelmed. A personal, non-transactional touchpoint breaks the pattern and restarts conversations that emails alone can't reopen.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nNo response needed — I know Q[X] is a lot.\n\nI sent something your way, just thought of you. And separately — a ${ind} team published results recently that I thought you'd find interesting given what ${acct} has been working on. I'll send the full piece separately.\n\nWhen things ease up, I'd love to reconnect.\n\n– [Your name]`; }
+    },
+    {
+      title: "Usage health workshop",
+      channels: ["CSM outreach","In-person / virtual workshop","Product-led email"],
+      effort: "Medium", budget: "$1,000–$2,000",
+      desc: (acct, ind, geo) => `Based on usage signals, offer ${acct}'s team a complimentary 2-hour hands-on session built around their actual charts, dashboards, and workflow gaps — not a generic training. Pair with a CSM-led check-in with the executive sponsor.`,
+      why: "Low adoption is the leading churn indicator — proactive skill-building tied to real workflow gaps turns passive users into internal advocates before renewal conversations begin.",
+      copy: (acct, ind, persona) => { const p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\nI was looking at how the ${acct} team has been using Amplitude and noticed a few places where the workflow doesn't quite match what the platform can do — specifically around [feature area], which is where ${p.angle} teams usually get the most leverage.\n\nI'd rather just run a focused 2-hour session with your team than send a doc — hands-on, built around your actual dashboards, no pitch.\n\nWould that be worth setting up?\n\n– [Your name]`; }
+    },
+    {
+      title: "Onsite customer success review",
+      channels: ["Onsite visit","Executive sponsor","Custom readout"],
+      effort: "High", budget: "$3,000–$5,000",
+      desc: (acct, ind, geo) => `Bring Amplitude's CSM and an executive to ${acct}'s offices for an in-person success review — demonstrate the ROI achieved to date, surface gaps in adoption, and co-develop a success roadmap for the next 12 months.`,
+      why: "Showing up in person for a renewal signals long-term partnership — accounts that receive onsite success reviews renew at significantly higher rates than those managed entirely remotely.",
+      copy: (acct, ind, persona) => `Hi [Name],\n\nAs we approach renewal, I'd love to come to ${acct}'s offices rather than do this over Zoom. We'd walk through what's been achieved, where there's more to unlock, and co-build a success plan for the next year.\n\nHaving [our executive] join would make it worth the time on both sides. Would [week of X] work?\n\n– [Your name]`
+    },
+    {
+      title: "1:1 ad track — reactivate the champion",
+      channels: ["LinkedIn matched audience","Sponsored content","Email"],
+      effort: "Low", budget: "$800–$2,000",
+      desc: (acct, ind, geo) => `Run a targeted LinkedIn campaign against the specific champion (or new stakeholder) at ${acct} who has gone quiet. Serve content relevant to their role and pain point for 3–4 weeks before re-initiating direct outreach — so the email lands to someone who already recognizes Amplitude.`,
+      why: "Re-engagement is easier when the contact already has context — 1:1 LinkedIn targeting rebuilds familiarity passively so your outreach doesn't feel cold even after a period of silence.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nHaven't connected in a while — I hope things have settled down on your end.\n\nI've been sharing some ${ind} content on [topic] lately that felt relevant to what ${acct} is working on. Wanted to make sure it was on your radar.\n\nOpen to a quick catch-up call when the timing is right?\n\n– [Your name]`; }
+    }
+  ],
+  "Drive expansion": [
+    {
+      title: "Land-and-expand — new team pilot",
+      channels: ["Email","Internal referral","Product trial"],
+      effort: "Medium", budget: "$1,500–$3,000",
+      desc: (acct, ind, geo) => `Work with your ${acct} champion to identify an adjacent team ready for Amplitude. Offer a no-friction pilot with a dedicated onboarding session and a clear success metric tied to that team's specific ${ind} use case.`,
+      why: "Expanding inside an existing customer has 5x higher conversion rates than net-new — a warm internal introduction eliminates the trust-building phase entirely.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"],p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\n[Champion name] thought it was worth an intro — sounds like the [team name] team at ${acct} is thinking about ${p.angle} and there's a natural fit with what the [existing team] has already built.\n\nThe foundation is already there — what usually takes months for a new team takes a few weeks when it's already instrumented. We've seen this unlock ${h.metric} for adjacent teams in ${ind} quickly.\n\n20 minutes to walk through what that would look like?\n\n– [Your name]`; }
+    },
+    {
+      title: "Gifting — new stakeholder introduction",
+      channels: ["Gifting (Sendoso)","Email","LinkedIn"],
+      effort: "Low", budget: "$1,000–$2,500",
+      desc: (acct, ind, geo) => `When targeting a new team or persona at ${acct} for expansion, lead with a thoughtful gift tailored to their role before any direct outreach. Use the gift as a warm conversation opener that signals you've done your homework.`,
+      why: "Expansion into a new stakeholder is essentially a cold open — gifting resets that dynamic and creates a personal connection before the business conversation begins.",
+      copy: (acct, ind, persona) => { const p=PERSONA_HOOKS[persona]||PERSONA_HOOKS["All"]; return `Hi [Name],\n\nI sent something your way — thought it might be relevant given the ${p.angle} work at ${acct}.\n\n[Champion name] suggested I reach out. The [existing team] has been using Amplitude for [X months] and I thought there might be something worth exploring on your side too.\n\nHappy to share what that's looked like — no pressure, just a conversation.\n\n– [Your name]`; }
+    },
+    {
+      title: "Feature deep-dive — private webinar",
+      channels: ["Private webinar","Email","In-product prompt"],
+      effort: "Low", budget: "$500–$1,500",
+      desc: (acct, ind, geo) => `Host a private session for ${acct}'s power users on capabilities they're not yet using — Experiment, Session Replay, or CDP. Show live ${ind} examples and tie outcomes to a specific expansion opportunity.`,
+      why: "Customers who attend feature deep-dives convert to expanded plans at 2x the rate of those who discover features on their own — guided context closes the gap.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nWe're running a private session for a small group of ${ind} teams on [feature] — more of a working session than a webinar, where we get into the data and show what's actually possible.\n\nA few accounts similar to ${acct} have been getting ${h.metric} from this and the biggest barrier is usually just not knowing it's there.\n\n45 minutes — can I hold a spot for your team?\n\n– [Your name]`; }
+    },
+    {
+      title: "Onsite expansion workshop",
+      channels: ["Onsite visit","Cross-functional workshop","Executive sponsor"],
+      effort: "High", budget: "$4,000–$8,000",
+      desc: (acct, ind, geo) => `Bring Amplitude's team to ${acct}'s offices for a cross-functional expansion workshop — map current usage across teams, identify the highest-value untapped use cases, and co-create a 90-day expansion roadmap with key stakeholders in the room.`,
+      why: "In-person co-creation generates stakeholder buy-in that no proposal document can match — leaving with a co-authored roadmap makes expansion feel like a joint decision, not a vendor upsell.",
+      copy: (acct, ind, persona) => `Hi [Name],\n\nI'd love to bring a small team to ${acct}'s offices for a working session — not a pitch, more of a mapping exercise where we look at how Amplitude is being used across teams, where there's untapped value, and co-build a 90-day plan.\n\nHaving [champion name] and a couple of stakeholders in the room would make it a lot more useful than another deck.\n\nWould [week of X] work?\n\n– [Your name]`
+    },
+    {
+      title: "Executive cross-sell briefing",
+      channels: ["VP-to-VP meeting","Custom ROI model","Case study"],
+      effort: "High", budget: "$3,000–$6,000",
+      desc: (acct, ind, geo) => `Arrange a VP-to-VP briefing at ${acct} to present an expansion business case, framing additional Amplitude capabilities as a natural evolution of their current investment. Build a custom ROI projection from ${acct}'s actual data.`,
+      why: "Expansion at Fortune 500 accounts almost always requires executive sponsorship — a peer conversation with a senior Amplitude leader turns upsell into strategic partnership.",
+      copy: (acct, ind, persona) => { const h=INDUSTRY_HOOKS[ind]||INDUSTRY_HOOKS["enterprise"]; return `Hi [Name],\n\nBased on how ${acct} has been using Amplitude, I think there's an expansion opportunity worth walking through directly — not a standard upsell, but a genuine look at where the untapped value is sitting.\n\nI'd love to bring [our VP] in for 30 minutes with a model built on ${acct}'s own data — what the next tier of capability could mean for ${h.pain} specifically.\n\nWorth the conversation?\n\n– [Your name]`; }
+    }
+  ]
+};
+
+const GOAL_FROM_STAGE = {S1:"Generate pipeline",S2:"Generate pipeline",S3:"Accelerate deal",S4:"Accelerate deal",S5:"Accelerate deal",S6:"Drive expansion"};
+
+function pickPlays(goal, account, persona) {
+  const pool = PLAYS_DB[goal] || PLAYS_DB["Generate pipeline"];
+  // Seed rotation from account name so same account always gets same plays,
+  // but different accounts get different combinations
+  const seed = [...account].reduce((s,c) => s + c.charCodeAt(0), 0);
+  const offset = seed % pool.length;
+  // Prefer plays whose channels match persona hints
+  const personaChannelHints = {
+    "Product":["Webinar","Email","Product trial","In-product prompt"],
+    "Engineering":["1:1 briefing","Security/compliance docs","Shared Slack channel","Workshop"],
+    "Marketing":["LinkedIn Ads","Programmatic","Content syndication","LinkedIn matched audience"],
+    "Data":["1:1 briefing","Workshop","Content syndication","Security/compliance docs"],
+    "AI Builder":["Workshop","Product trial","Webinar","LinkedIn matched audience"],
+    "All":[]
+  };
+  const hints = personaChannelHints[persona] || [];
+  // Score each play: +2 if a channel matches a hint, else 0; then rotate by offset
+  const scored = pool.map((p,i) => ({
+    play: p,
+    score: p.channels.some(c => hints.includes(c)) ? 2 : 0,
+    idx: i
+  }));
+  scored.sort((a,b) => b.score - a.score || ((a.idx + pool.length - offset) % pool.length) - ((b.idx + pool.length - offset) % pool.length));
+  return scored.slice(0,3).map(s => s.play);
+}
+
+function fitScores(goal, plays) {
+  const base = {"Generate pipeline":[94,87,81],"Accelerate deal":[96,89,83],"Multithread personas":[91,85,79],"Prevent churn":[93,86,80],"Drive expansion":[95,88,82]};
+  return base[goal] || [92,85,78];
+}
+
+function inferGoal(stage, acctType) {
+  if (acctType === "Customer") return "Prevent churn";
+  return GOAL_FROM_STAGE[stage] || "Generate pipeline";
+}
+
+function effortClass(e) {
+  if (e === "Low") return "tag-effort-low";
+  if (e === "Medium") return "tag-effort-med";
+  return "tag-effort-high";
+}
+
+function copyPlay(idx) {
+  const el = document.getElementById('copy-text-' + idx);
+  if (!el) return;
+  const btn = document.getElementById('copy-btn-' + idx);
+  navigator.clipboard.writeText(el.innerText).then(() => {
+    btn.classList.add('copied');
+    btn.innerHTML = '✓ Copied';
+    setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '⎘ Copy'; }, 2000);
+  });
+}
+
+function generate() {
+  const scene = document.getElementById('scene');
+  const headline = document.getElementById('emptyHeadline');
+
+  // Reset and trigger building animation
+  scene.classList.remove('building');
+  void scene.offsetWidth; // force reflow so animation restarts
+  scene.classList.add('building');
+  headline.textContent = 'Building your playbook…';
+
+  // Show results after animation completes (~4s)
+  setTimeout(_renderResults, 4000);
+}
+
+function _renderResults() {
+  const account = document.getElementById('account').value.trim() || "the account";
+  const industry = document.getElementById('industry').value || "enterprise";
+  const geo = document.getElementById('geo').value || "AMER";
+  const persona = document.getElementById('persona').value || "All";
+  const acctType = document.getElementById('acctType').value;
+  const stage = document.getElementById('stage').value;
+  let goal = document.getElementById('goal').value;
+  if (!goal) goal = inferGoal(stage, acctType);
+
+  const plays = pickPlays(goal, account, persona);
+  const scores = fitScores(goal, plays);
+  const personaLabel = persona !== "All" ? ` · ${persona} persona` : "";
+
+  let html = `<div class="results-header">
+    <div class="results-title">✦ Plays for <strong>${account}</strong></div>
+    <div class="results-meta">${goal} · ${geo} · ${industry}${personaLabel}</div>
+  </div>`;
+
+  const contacts = CONTACTS_DB[goal] || CONTACTS_DB["Generate pipeline"];
+
+  plays.forEach((play, i) => {
+    const channels = play.channels.map(c => `<span class="tag tag-channel">${c}</span>`).join('');
+    const copyText = play.copy(account, industry, persona);
+    const scoreClass = scores[i] >= 90 ? "score-high" : "score-med";
+    const contact = contacts[i];
+    html += `<div class="play-card">
+      <div class="card-top">
+        <div class="card-left">
+          <div class="play-num">Play ${i + 1} of 3</div>
+          <div class="play-title">${play.title}</div>
+          <div class="tags">
+            ${channels}
+            <span class="tag ${effortClass(play.effort)}">${play.effort} effort</span>
+            <span class="tag tag-budget">${play.budget}</span>
+          </div>
+        </div>
+        <div class="score-badge ${scoreClass}">
+          <span class="score-num">${scores[i]}</span>
+          <span class="score-label">FIT</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <p class="desc">${play.desc(account, industry, geo)}</p>
+      <div class="why">💡 ${play.why}</div>
+      <div class="copy-section">
+        <div class="copy-header">
+          <span class="copy-label">✉ Copy starter</span>
+          <button class="copy-btn" id="copy-btn-${i}" onclick="copyPlay(${i})">⎘ Copy</button>
+        </div>
+        <pre class="copy-text" id="copy-text-${i}">${copyText}</pre>
+      </div>
+      <div class="contacts-section">
+        <div class="contacts-label">Suggested contact</div>
+        <div class="contact-list">
+          <div class="contact-row">
+            <div class="contact-avatar" style="background:${contact.color};color:${contact.textColor}">${contact.initials}</div>
+            <div class="contact-info">
+              <div class="contact-name">${contact.name}</div>
+              <div class="contact-title">${contact.title} · ${account}</div>
+            </div>
+            <span class="contact-reason">${contact.reason}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('emptyState').style.display = 'none';
+  const r = document.getElementById('results');
+  r.innerHTML = html;
+  r.style.display = 'block';
+}
+
+</script>
+</body>
+</html>
